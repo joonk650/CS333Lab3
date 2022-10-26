@@ -1,0 +1,383 @@
+<html>
+  <!DOCTYPE html>
+  <meta charset="utf-8" />
+  <style>
+    .states {
+      fill: #ccc;
+      stroke: #fff;
+    }
+
+    .symbol {
+      fill-opacity: 0.8;
+      stroke: #fff;
+    }
+  </style>
+  <body>
+    <!-- d3 v7 integration -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- d3 topojson -->
+    <script src="http://d3js.org/topojson.v1.min.js"></script>
+    <!-- MAP -->
+    <div>
+      <script>
+        let width = 600,
+          height = 400;
+          margin = { top: 30, right: 30, bottom: 30, left: 30 };
+
+        let projection = d3.geoAlbersUsa();
+        let path = d3.geoPath().projection(projection);
+
+        let svg = d3.select("body").append("svg")
+          // .attr("width", width)
+          .attr("height", margin.top);
+
+        let div = d3.select("body").append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+
+        // map
+        let chart1 = d3.select("body")
+        .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .style("float", "left")
+        .append("g")
+          .attr("transform", "translate(0, 0)")
+
+        // scatter plot
+        let chart2 = d3.select("body")
+        .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .style("float", "left")
+        .append("g")
+          .attr("transform", "translate(60, 10)")
+
+        // bar chart
+        let chart3 = d3.select("body")
+        .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .style("float", "left")
+        .append("g")
+          .attr("transform", "translate(60, 10)")
+
+        let us, states, centroid;
+
+        let max_x, max_y, xScale, yScale, xScaleBars, yScaleBars
+
+        let states_data
+
+        let radius = 10
+        let pointRadius = 3
+
+        // Map [CHART 1]
+        function drawStates() {
+          chart1.append("path")
+            .attr("transform", "scale(0.7, 0.7)")
+            .attr("class", "states")
+            .datum(topojson.feature(states, states.objects.usStates))
+            .attr("d", path);
+        }
+
+        function drawCircles(data) {
+          chart1.selectAll(".symbol")
+            .data(
+              data.sort(
+                (a, b) => b.properties.population - a.properties.population
+              )
+            )
+            .join(
+              (enter) => enter.append("path")
+                .attr("class", "symbol")
+                .attr("fill", "green")
+                .attr("d", path.pointRadius((d) => radius))
+                .attr("transform", "scale(0.7, 0.7)"),
+              (update) => update.attr("fill", d => {
+                // if (d.properties.selected){
+                //   console.log("THE ONE PIECE IS REALLL")
+                // }
+                return d.properties.selected ? "blue" : "green"})
+            );
+        }
+
+        // Scatter Plot [CHART 2]
+        function drawScatterAxes() {
+          chart2.append("g")
+            .attr("transform", "translate(0, 300)") //pos2 has yScale range
+            .call(d3.axisBottom(xScale)); 
+          chart2.append("g")
+            .call(d3.axisLeft(yScale));
+
+          // console.log(data[3].properties.population)
+          // console.log(data[3].properties.unemployment)
+          // console.log(xScale(data[3].properties.population))
+          // console.log(yScale(data[3].properties.unemployment))
+
+          // X Label
+          chart2.append('text')
+            .attr('transform', 'translate(' + (width/2 - 40) + ',' + (height - 50) + ')')
+            .attr('text-anchor', 'middle')
+            .style('font-family', 'TimesNewRoman')
+            .style('font-size', 18)
+            .attr("font-weight", 550)
+            .text('Population');
+
+          // Y Label
+          chart2.append('text')
+            .attr('transform', 'translate(-40,' + (height/2 - 50) + ')rotate(-90)')
+            .attr('text-anchor', 'middle')
+            .style('font-family', 'TimesNewRoman')
+            .style('font-size', 18)
+            .attr("font-weight", 550)
+            .text('Unemployment Rate');
+        }
+
+        function drawScatterPoints(data){
+          chart2.selectAll('circle')
+            .data(data)
+            .join(
+              (enter) => enter.append("circle")
+                .attr("cx", d => xScale(d.properties.population))
+                .attr("cy", d => yScale(d.properties.unemployment))
+                .attr("fill", "black")
+                .attr("r", pointRadius),
+              (update) => update.attr("fill", d => {
+                // if (d.properties.selected){
+                //   console.log("THE ONE PIECE IS REAL")
+                // }
+                return d.properties.selected ? "blue" : "black"
+              })
+            )
+        }
+
+        function drawBarsAxes(data) {
+          let d = data.filter(i => i.properties.selected);
+          if (d.length == 0){
+            d = data;
+          }
+          let state_names = new Array(d.length);
+
+          for (let i = 0; i < d.length; i++){
+            state_names[i] = d[i].properties.name
+            // console.log(state_names[i])
+          }
+
+          xScaleBars = d3.scaleBand()
+            .domain(state_names) //axes changes based on brush selection
+            .range([0,500]);
+
+          // State Labels
+          chart3.append("g")
+            .attr("transform", "translate(0, 200)") //pos2 has yScale range
+            .call(d3.axisBottom(xScaleBars)
+              .ticks(d.length)
+              .tickValues(d.map(a => a.properties.name)))
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", "rotate(-65)");
+              
+          chart3.append("g")
+            .call(d3.axisLeft(yScaleBars));
+
+          // X Label
+          chart3.append('text')
+            .attr('transform', 'translate(' + (width/2 - 40) + ',' + (height - 100) + ')')
+            .attr('text-anchor', 'middle')
+            .style('font-family', 'TimesNewRoman')
+            .style('font-size', 18)
+            .attr("font-weight", 550)
+            .text('States');
+
+          // Y Label
+          chart3.append('text')
+            .attr('transform', 'translate(-40,' + (height/2 - 100) + ')rotate(-90)')
+            .attr('text-anchor', 'middle')
+            .style('font-family', 'TimesNewRoman')
+            .style('font-size', 18)
+            .attr("font-weight", 550)
+            .text('Unemployment Rate');
+
+          // console.log(xScaleBars(d[9].properties.name))
+          // console.log(xScaleBars.bandwidth())
+          console.log(d[3].properties.name)
+          console.log(d[3].properties.unemployment)
+          console.log(yScaleBars(d[3].properties.unemployment))
+
+          // Bars
+          chart3.selectAll('rect')
+          .data(d)
+          .join(
+            (enter) => enter.append("rect")
+              .attr("x", d => xScaleBars(d.properties.name))
+              .attr("y", d => yScaleBars(d.properties.unemployment))
+              .attr("width", xScaleBars.bandwidth()) //bandwidth is 0
+              .attr("height", d => 200 - yScaleBars(d.properties.unemployment))
+              .attr('fill', "blue"),
+            (update) => update
+              .attr("x", d => xScaleBars(d.properties.name))
+              .attr("y", d => yScaleBars(d.properties.unemployment))
+              .attr("width", xScaleBars.bandwidth())
+              .attr("height", d => 200 - yScaleBars(d.properties.unemployment))
+              .attr('fill', "blue")
+          );
+        }
+
+        // function drawBars(data) {
+        //   let d = data.filter(i => i.properties.selected);
+        //   if (d.length == 0){
+        //     d = data;
+        //   }
+        //   console.log(d.map(a => a.properties.name))
+        //   console.log(xScaleBars(d.properties.name))
+
+        //   chart3.selectAll('rect')
+        //   .data(d)
+        //   .join(
+        //     enter => enter.append("rect")
+        //       .attr('class', d => d.properties.name)
+        //       .attr("x", d => xScaleBars(d.properties.name))
+        //       .attr("y", d => (0 - margin.bottom) - yScaleBars(d.properties.unemployment))
+        //       .attr("width", xScaleBars.bandwidth())
+        //       .attr("height", d => yScaleBars(d.properties.unemployment))
+        //       .attr('fill', "blue"),
+        //     update => update.transition()
+        //       .duration(500)
+        //       .attr("width", xScaleBars.bandwidth())
+        //       .attr("height", d => yScaleBars(d.properties.unemployment))
+        //   );
+        // }
+
+        // mark the brushed circles
+        brushed = function() {
+          const ext = d3.brushSelection(this);
+
+          states_data.map(d => {
+            // if parts of any circles fall within the bounds of the brush, mark them as selected
+            d.properties.selected = (
+            xScale(d.properties.population) >= ext[0][0] - pointRadius &&
+            xScale(d.properties.population) <= ext[1][0] + pointRadius &&
+            yScale(d.properties.unemployment) >= ext[0][1] - pointRadius &&
+            yScale(d.properties.unemployment) <= ext[1][1] + pointRadius)
+
+            // if (d.properties.selected){
+            //   console.log(d.properties.selected)
+            //   console.log(d.properties.name)
+            //   console.log(d.properties.population)
+            //   console.log(d.properties.unemployment)
+            // }
+
+            return d
+          })
+
+          //redraw scatterplot and circle on map
+          drawScatterPoints(states_data)
+          drawCircles(states_data)
+        }
+
+        startBrushed = function () {
+          // clear selected stuff
+          states_data.map(d => {
+            d.properties.selected = false
+            return d
+          })
+
+          //redraw scatterplot and circle on map
+          drawScatterPoints(states_data)
+          drawCircles(states_data)
+        }
+
+        // declare brush
+        const brush = chart2.append("g")
+        .call(d3.brush()
+          .on("start", startBrushed)
+          .on("brush", brushed)
+          .extent( [ [0, -margin.top], [width + margin.right, height - 3*margin.bottom - 10] ] ));
+
+        async function ready() {
+          // load files async; store the values so we can use them later
+          states = await d3.json("states.json");
+          centroid = await d3.json("states-centroid-data.json");
+
+          states_data = centroid.features;
+
+          // Scatter variables
+          max_x = d3.max(d3.map(states_data, d=> d.properties.population))
+          max_y = d3.max(d3.map(states_data, d=> d.properties.unemployment))
+
+          xScale = d3.scaleLinear()
+            .domain([0, max_x]) 
+            .range([0, 500]);
+          yScale = d3.scaleLinear()
+            .domain([0, max_y])
+            .range([300, 0]);
+
+          yScaleBars = d3.scaleLinear()
+            .domain([0, max_y])
+            .range([200, 0]);
+
+
+          drawStates();
+          drawCircles(states_data);
+          drawScatterAxes();
+          drawScatterPoints(states_data);
+          drawBarsAxes(states_data);
+          // drawBars(states_data);
+        }
+        ready();
+      </script>
+    </div>
+  </body>
+</html>
+<!-- 
+
+      // init(){
+      //     // map
+
+      //     states
+
+      //     // scatterplot
+      //     axes
+      //     brush(
+      //         update()
+      //     )
+
+      //     // bar graph
+      //     axes
+      // }
+
+      // update(){
+      //     //map
+      //     change colors
+
+      //     d3.select('my-map')
+      //     .data(...)
+      //     .join(
+      //         enter => enter, // optional depending on code
+      //         update => update, // change something
+      //         exit => exit
+      //     )
+
+      //     //scatterplot could be function
+      //     change colors
+
+      //     //bar graph
+      //     recalculate x-axis //d3.select('xaxis')
+
+      //     bargraph
+      // }
+
+      // read_data(){
+      //     data = from File
+      //     init()
+      //     update()
+
+      // }
+
+      // d3.select('menu')
+      // .do_something(
+      //     update()
+      //     updateBarGraph()
+      // ) -->

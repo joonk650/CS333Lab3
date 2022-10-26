@@ -1,0 +1,78 @@
+<html>
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .states {
+    fill: #ccc;
+    stroke: #fff;
+  }
+
+  .symbol {
+    fill-opacity: .8;
+    stroke: #fff;
+  }
+</style>
+
+<body>
+  <!-- d3 v7 integration -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <!-- d3 topojson -->
+  <script src="http://d3js.org/topojson.v1.min.js"></script>
+
+  <script>
+    let width = 960,
+      height = 500;
+
+    let projection = d3.geoAlbersUsa();
+    let path = d3.geoPath()
+      .projection(projection);
+
+    let svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    let variableOptions = ["none", "population", "unemployment"];
+    let sizeVar, colorVar;
+
+    let us, states, centroid;
+
+
+    function drawStates() {
+      svg.append("path")
+        .attr("class", "states")
+        .datum(topojson.feature(states, states.objects.usStates))
+        .attr("d", path);
+    }
+
+    function drawCircles() {
+      svg.selectAll(".symbol")
+        .data(centroid.features.sort((a, b) => b.properties.population - a.properties.population))
+        .join(
+          enter => enter.append("path")
+            .attr("class", "symbol")
+            .attr("fill", "green")
+            .attr("d", path.pointRadius(d => 10))
+        );
+
+    }
+
+    async function ready() {
+      // load files async; store the values so we can use them later
+      states = await d3.json("states.json");
+      centroid = await d3.json("states-centroid-data.json");
+
+      drawStates();
+      drawCircles();
+
+
+    }
+
+    // call the function that draws
+    ready();
+
+
+  </script>
+
+</body>
+
+</html>
